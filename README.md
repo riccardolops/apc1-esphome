@@ -99,3 +99,36 @@ The `error_code` sensor exposes internal bit-flags. You can monitor the ESPHome 
 - `0x10`: Laser error
 - `0x20`: VOC sensor error
 - `0x40`: Temperature/Humidity sensor error
+
+## Extending Sensor Lifespan (Deep Sleep)
+The APC1 uses a laser for PM measurement and a mechanical fan. Running them continuously 24/7 will reduce their lifespan (typically to 3-5 years). 
+To extend the lifespan to over 15 years, you can use the `SET` pin (Pin 3) to put the sensor into Deep Sleep mode between measurements.
+
+1. Connect the `SET` pin of the APC1 to a free GPIO on your ESP.
+2. Disable the automatic `update_interval` in the component.
+3. Use a `switch` and an `interval` to manually wake the sensor, wait for stabilization, take a reading, and put it back to sleep.
+
+```yaml
+switch:
+  - platform: gpio
+    pin: GPIO2 # Replace with your connected GPIO
+    id: apc_set
+    name: "APC1 Power Switch"
+    restore_mode: ALWAYS_OFF
+
+sensor:
+  - platform: apc
+    id: my_apc
+    update_interval: never # Disable auto-polling
+    pm_2_5:
+      name: "APC1 PM2.5"
+    # ... other sensors
+
+interval:
+  - interval: 120s
+    then:
+      - switch.turn_on: apc_set
+      - delay: 30s # Wait for airflow and gas sensors to stabilize
+      - component.update: my_apc
+      - switch.turn_off: apc_set
+```
